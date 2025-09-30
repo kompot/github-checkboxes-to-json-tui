@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { render, Box, Text, useApp, useInput } from 'ink';
+import React, { useState } from "react";
+import { render, Box, Text, useApp, useInput } from "ink";
 
 type ServiceNode = {
   name: string;
+  description: string;
   checked: boolean;
   children?: ServiceNode[];
 };
@@ -17,27 +18,25 @@ type FlatService = {
 
 /**
  * Flatten nested services into a list of names.
- * If a parent is checked, all children are included.
+ * Only includes nodes that are actually checked.
  */
 function flattenServices(services: ServiceNode[]): string[] {
   const result: string[] = [];
 
-  function traverse(node: ServiceNode, parentChecked: boolean) {
-    const effectiveChecked = parentChecked || node.checked;
-
-    if (effectiveChecked) {
+  function traverse(node: ServiceNode) {
+    if (node.checked) {
       result.push(node.name);
     }
 
     if (node.children) {
       for (const child of node.children) {
-        traverse(child, effectiveChecked);
+        traverse(child);
       }
     }
   }
 
   for (const svc of services) {
-    traverse(svc, false);
+    traverse(svc);
   }
 
   return result;
@@ -46,13 +45,16 @@ function flattenServices(services: ServiceNode[]): string[] {
 /**
  * Convert nested services to flat list for display
  */
-function servicesToFlatList(services: ServiceNode[], expandedPaths: Set<string>): FlatService[] {
+function servicesToFlatList(
+  services: ServiceNode[],
+  expandedPaths: Set<string>
+): FlatService[] {
   const result: FlatService[] = [];
 
   function traverse(nodes: ServiceNode[], level: number, parentPath: number[]) {
     nodes.forEach((node, index) => {
       const currentPath = [...parentPath, index];
-      const pathKey = currentPath.join('-');
+      const pathKey = currentPath.join("-");
       const isParent = Boolean(node.children && node.children.length > 0);
       const expanded = expandedPaths.has(pathKey);
 
@@ -76,20 +78,42 @@ function servicesToFlatList(services: ServiceNode[], expandedPaths: Set<string>)
 
 const initialServices: ServiceNode[] = [
   {
-    name: 'backend',
+    name: "backend",
+    description: "Backend services and APIs",
     checked: false,
     children: [
-      { name: 'auth', checked: true },
-      { name: 'billing', checked: false },
-      { name: 'notifications', checked: false },
+      {
+        name: "auth",
+        description: "Authentication and authorization service",
+        checked: false,
+      },
+      {
+        name: "billing",
+        description: "Payment processing and subscription management",
+        checked: true,
+      },
+      {
+        name: "notifications",
+        description: "Email and push notification system",
+        checked: false,
+      },
     ],
   },
   {
-    name: 'frontend',
-    checked: true, // selecting frontend should include all its children
+    name: "frontend",
+    description: "User interface applications",
+    checked: true,
     children: [
-      { name: 'dashboard', checked: false },
-      { name: 'settings', checked: false },
+      {
+        name: "dashboard",
+        description: "Main administrative dashboard",
+        checked: true,
+      },
+      {
+        name: "settings",
+        description: "User settings and preferences panel",
+        checked: true,
+      },
     ],
   },
 ];
@@ -97,14 +121,22 @@ const initialServices: ServiceNode[] = [
 function ServiceTreeTUI() {
   const { exit } = useApp();
   const [services, setServices] = useState<ServiceNode[]>(initialServices);
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set(['0', '1'])); // Expand root items by default
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
+    new Set(["0", "1"])
+  ); // Expand root items by default
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const flatList = servicesToFlatList(services, expandedPaths);
 
   // Helper function to update service by path
-  const updateServiceByPath = (path: number[], updater: (service: ServiceNode) => ServiceNode): ServiceNode[] => {
-    const updateRecursive = (nodes: ServiceNode[], currentPath: number[]): ServiceNode[] => {
+  const updateServiceByPath = (
+    path: number[],
+    updater: (service: ServiceNode) => ServiceNode
+  ): ServiceNode[] => {
+    const updateRecursive = (
+      nodes: ServiceNode[],
+      currentPath: number[]
+    ): ServiceNode[] => {
       if (currentPath.length === 0) return nodes;
 
       return nodes.map((node, index) => {
@@ -114,7 +146,9 @@ function ServiceTreeTUI() {
           } else {
             return {
               ...node,
-              children: node.children ? updateRecursive(node.children, currentPath.slice(1)) : undefined,
+              children: node.children
+                ? updateRecursive(node.children, currentPath.slice(1))
+                : undefined,
             };
           }
         }
@@ -127,7 +161,7 @@ function ServiceTreeTUI() {
 
   // Toggle expansion of a node
   const toggleExpansion = (path: number[]) => {
-    const pathKey = path.join('-');
+    const pathKey = path.join("-");
     const newExpanded = new Set(expandedPaths);
     if (newExpanded.has(pathKey)) {
       newExpanded.delete(pathKey);
@@ -137,12 +171,28 @@ function ServiceTreeTUI() {
     setExpandedPaths(newExpanded);
   };
 
-  // Toggle checked state of a node
+  // Toggle checked state of a node and update children if it's a parent
   const toggleChecked = (path: number[]) => {
-    const newServices = updateServiceByPath(path, (service) => ({
-      ...service,
-      checked: !service.checked,
-    }));
+    const newServices = updateServiceByPath(path, (service) => {
+      const newCheckedState = !service.checked;
+
+      // If this is a parent node, update all children to match
+      const updateChildren = (node: ServiceNode): ServiceNode => {
+        if (node.children) {
+          return {
+            ...node,
+            checked: newCheckedState,
+            children: node.children.map((child) => updateChildren(child)),
+          };
+        }
+        return {
+          ...node,
+          checked: newCheckedState,
+        };
+      };
+
+      return updateChildren(service);
+    });
     setServices(newServices);
   };
 
@@ -171,36 +221,30 @@ function ServiceTreeTUI() {
       if (selectedItem.isParent && selectedItem.expanded) {
         toggleExpansion(selectedItem.path);
       }
-    } else if (input === ' ' || key.return) {
+    } else if (input === " " || key.return) {
       const selectedItem = flatList[selectedIndex];
       toggleChecked(selectedItem.path);
-    } else if (input === 'f') {
+    } else if (input === "f") {
       handleQuit();
-    } else if (input === 'q' || key.escape) {
+    } else if (input === "q" || key.escape) {
       handleQuit();
     }
   });
 
-  // Check if a service is effectively checked (either directly or through parent)
-  const isEffectivelyChecked = (path: number[]): boolean => {
+  // Get the actual checked state of a service by path
+  const getServiceByPath = (path: number[]): ServiceNode | null => {
     let current: ServiceNode[] = services;
-    let parentChecked = false;
-
     for (let i = 0; i < path.length; i++) {
       const index = path[i];
-      if (!current[index]) return false;
-
-      const node = current[index];
-      parentChecked = parentChecked || node.checked;
+      if (!current[index]) return null;
 
       if (i === path.length - 1) {
-        return parentChecked;
+        return current[index];
       }
 
-      current = node.children || [];
+      current = current[index].children || [];
     }
-
-    return false;
+    return null;
   };
 
   return (
@@ -209,29 +253,38 @@ function ServiceTreeTUI() {
         Service Tree Navigator
       </Text>
       <Text color="gray">
-        ↑↓ Navigate | → Expand | ← Collapse | SPACE/ENTER Toggle | F Export & Quit | Q Quit
+        ↑↓ Navigate | → Expand | ← Collapse | SPACE/ENTER Toggle | F Export &
+        Quit | Q Quit
       </Text>
       <Text> </Text>
       {flatList.map((item, index) => {
         const isSelected = index === selectedIndex;
-        const isChecked = isEffectivelyChecked(item.path);
-        const indent = '  '.repeat(item.level);
+        const service = getServiceByPath(item.path);
+        const isChecked = service?.checked || false;
+        const indent = "  ".repeat(item.level);
 
-        let prefix = '';
+        let prefix = "";
         if (item.isParent) {
-          prefix = item.expanded ? '▼ ' : '▶ ';
+          prefix = item.expanded ? "▼ " : "▶ ";
         } else {
-          prefix = '  ';
+          prefix = "  ";
         }
 
-        const checkbox = isChecked ? '[✓]' : '[ ]';
-        const color = isSelected ? 'cyan' : isChecked ? 'green' : 'white';
-        const backgroundColor = isSelected ? 'gray' : undefined;
+        const checkbox = isChecked ? "[✓]" : "[ ]";
+        const color = isSelected ? "blue" : isChecked ? "green" : "white";
+        const backgroundColor = isSelected ? "black" : undefined;
 
         return (
-          <Text key={item.path.join('-')} color={color} backgroundColor={backgroundColor}>
-            {indent}{prefix}{checkbox} {item.name}
-          </Text>
+          <Box key={item.path.join("-")} flexDirection="column">
+            <Text color={color} backgroundColor={backgroundColor}>
+              {indent}{prefix}{checkbox} {item.name}
+              {service?.description && (
+                <Text color="white" dimColor>
+                  {' '}{service.description}
+                </Text>
+              )}
+            </Text>
+          </Box>
         );
       })}
     </Box>
