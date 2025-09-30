@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react"
+  },
+  "imports": {
+    "react": "npm:react@^19.1.1",
+    "ink": "npm:ink@^6.3.1"
+  },
+  "tasks": {
+    "dev": "deno run --allow-all src/generate-flattened-list.tsx",
+    "start": "deno run --allow-all src/generate-flattened-list.tsx"
+  }
+}
