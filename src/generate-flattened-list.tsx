@@ -224,8 +224,6 @@ function ServiceTreeTUI() {
     } else if (input === " " || key.return) {
       const selectedItem = flatList[selectedIndex];
       toggleChecked(selectedItem.path);
-    } else if (input === "f") {
-      handleQuit();
     } else if (input === "q" || key.escape) {
       handleQuit();
     }
@@ -253,8 +251,7 @@ function ServiceTreeTUI() {
         Service Tree Navigator
       </Text>
       <Text color="gray">
-        ↑↓ Navigate | → Expand | ← Collapse | SPACE/ENTER Toggle | F Export &
-        Quit | Q Quit
+        ↑↓ Navigate | → Expand | ← Collapse | SPACE/ENTER Toggle | Q Quit
       </Text>
       <Text> </Text>
       {flatList.map((item, index) => {
